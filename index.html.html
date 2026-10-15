@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Firefly Jar</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--sky:#1d2340;--sky2:#2b2f5e;--ground:#1f4d4a;--glow:#ffb347;--moth:#e86a8a;--bonus:#fff6c9;--slow:#6fe3ff;--mist:#e8e4f3;--ink:#1d2340;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root[data-scene="sea"]{--sky:#04263a;--sky2:#07506b;--ground:#0b7a7a;--glow:#7dffb3;--moth:#ff7a59;--bonus:#e6fff1;--slow:#ffd166;--ink:#04263a}
+:root[data-scene="dusk"]{--sky:#3a1c47;--sky2:#a2456b;--ground:#f2a65a;--glow:#fff1a8;--moth:#3d1a78;--bonus:#ffffff;--slow:#8be9fd;--ink:#3a1c47}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+*{box-sizing:border-box}
+body{margin:0;height:100%;background:var(--sky);color:var(--mist);font-family:'Bricolage Grotesque',system-ui,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
+#app{position:relative;height:100%;background:linear-gradient(var(--sky),var(--sky2) 70%,var(--ground) 100%);transition:filter .4s}
+#app.slowed{filter:hue-rotate(25deg) saturate(1.3)}
+#hud{position:absolute;top:12px;left:16px;right:16px;display:flex;justify-content:space-between;font-weight:700;font-size:1.05rem;z-index:3;pointer-events:none}
+#field{position:absolute;inset:0;touch-action:manipulation}
+.fly{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;background:var(--glow);box-shadow:0 0 18px 8px color-mix(in srgb,var(--glow) 55%,transparent);border:0;padding:0;cursor:pointer}
+.fly.moth{background:var(--moth);box-shadow:0 0 10px 3px color-mix(in srgb,var(--moth) 40%,transparent);width:22px;height:22px;margin:-11px 0 0 -11px;opacity:.8}
+.fly.bonus{background:var(--bonus);width:38px;height:38px;margin:-19px 0 0 -19px;box-shadow:0 0 26px 12px color-mix(in srgb,var(--bonus) 70%,transparent)}
+.fly.slow{background:var(--slow);box-shadow:0 0 22px 9px color-mix(in srgb,var(--slow) 60%,transparent);border-radius:30%}
+.fly:focus-visible,button:focus-visible{outline:3px solid var(--mist);outline-offset:4px}
+.pop{position:absolute;font-weight:800;pointer-events:none;transition:transform .6s,opacity .6s;z-index:2;color:var(--mist)}
+#banner{position:absolute;top:22%;left:0;right:0;text-align:center;font-weight:800;font-size:2rem;pointer-events:none;opacity:0;transition:opacity .3s;z-index:3}
+#banner.show{opacity:1}
+#panel{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;background:color-mix(in srgb,var(--sky) 85%,transparent);z-index:4}
+#panel h1{font-size:clamp(2.4rem,9vw,4rem);font-weight:800;margin:0;letter-spacing:-.02em}
+#panel p{margin:0;max-width:34ch;line-height:1.5}
+.legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;font-size:.9rem}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.scenes{display:flex;gap:8px}
+.scenes button{font:inherit;font-weight:700;padding:8px 14px;border-radius:999px;border:2px solid var(--mist);background:transparent;color:var(--mist);cursor:pointer}
+.scenes button[aria-pressed="true"]{background:var(--mist);color:var(--ink)}
+button.go{font:inherit;font-weight:800;font-size:1.1rem;padding:14px 32px;border-radius:999px;border:0;background:var(--glow);color:var(--ink);cursor:pointer}
+#mute{position:absolute;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:5;font:inherit;font-weight:700;padding:8px 14px;border-radius:999px;border:2px solid var(--mist);background:transparent;color:var(--mist);cursor:pointer}
+.hidden{display:none!important}
+@media (prefers-reduced-motion:reduce){.pop,#banner,#app{transition:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud"><span>Jar: <span id="score">0</span></span><span>Level <span id="lvl">1</span></span><span><span id="time">40</span>s</span></div>
+  <div id="field"></div>
+  <div id="banner"></div>
+  <button id="mute" aria-pressed="false">Sound on</button>
+  <div id="panel">
+    <h1 id="title">Firefly Jar</h1>
+    <p id="msg">Tap the glowing fireflies. You have 40 seconds, and it gets faster every level.</p>
+    <div class="legend">
+      <span><i style="background:var(--glow)"></i>+1</span>
+      <span><i style="background:var(--bonus)"></i>+5 star</span>
+      <span><i style="background:var(--slow);border-radius:30%"></i>slows time</span>
+      <span><i style="background:var(--moth)"></i>moth −2</span>
+    </div>
+    <div class="scenes" role="group" aria-label="Scene">
+      <button data-scene="night" aria-pressed="true">Meadow</button>
+      <button data-scene="sea" aria-pressed="false">Deep sea</button>
+      <button data-scene="dusk" aria-pressed="false">Dusk</button>
+    </div>
+    <p id="bestline"></p>
+    <button class="go" id="start">Start catching</button>
+  </div>
+</div>
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var field=$('field'),panel=$('panel'),scoreEl=$('score'),timeEl=$('time'),lvlEl=$('lvl'),banner=$('banner'),app=$('app'),root=document.documentElement;
+var DUR=40,score=0,caught=0,level=1,flies=[],running=false,last=0,spawnT=0,clock=0,slowLeft=0,best=0,muted=false,ac=null,bt=0;
+try{best=parseInt(localStorage.getItem('firefly-best'),10)||0;var sc=localStorage.getItem('firefly-scene');if(sc)setScene(sc)}catch(e){}
+$('bestline').textContent=best?'Best: '+best:'';
+
+function setScene(s){
+  root.setAttribute('data-scene',s);
+  document.querySelectorAll('.scenes button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.scene===s))});
+  try{localStorage.setItem('firefly-scene',s)}catch(e){}
+}
+document.querySelectorAll('.scenes button').forEach(function(b){b.addEventListener('click',function(){setScene(b.dataset.scene)})});
+
+function tone(f,d,type,v,delay){
+  if(muted||!ac)return;
+  var t=ac.currentTime+(delay||0),o=ac.createOscillator(),g=ac.createGain();
+  o.type=type||'sine';o.frequency.setValueAtTime(f,t);
+  g.gain.setValueAtTime(v||.15,t);g.gain.exponentialRampToValueAtTime(.001,t+d);
+  o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+d);
+}
+var sfx={
+  catch:function(){tone(520+level*40,.12,'sine')},
+  moth:function(){tone(150,.25,'sawtooth',.12)},
+  bonus:function(){[660,880,1320].forEach(function(f,i){tone(f,.15,'triangle',.15,i*.07)})},
+  slow:function(){tone(900,.4,'sine',.15);tone(450,.4,'sine',.12,.1)},
+  level:function(){[523,659,784,1047].forEach(function(f,i){tone(f,.15,'square',.08,i*.08)})},
+  end:function(){[440,330,262].forEach(function(f,i){tone(f,.25,'triangle',.15,i*.15)})}
+};
+$('mute').addEventListener('click',function(){muted=!muted;this.textContent=muted?'Sound off':'Sound on';this.setAttribute('aria-pressed',String(muted))});
+
+function params(){return{
+  gap:Math.max(.18,.7-.07*(level-1)),
+  life:Math.max(1.2,3.2-.25*(level-1)),
+  moth:Math.min(.4,.18+.03*(level-1))
+}}
+function spawn(){
+  var w=field.clientWidth,h=field.clientHeight,p=params(),r=Math.random(),type='fly';
+  if(r<p.moth)type='moth';else if(r<p.moth+.05)type='bonus';else if(r<p.moth+.09&&slowLeft<=0)type='slow';
+  var el=document.createElement('button');
+  el.className='fly '+(type==='fly'?'':type);
+  el.setAttribute('aria-label',{fly:'Firefly',moth:'Moth, avoid',bonus:'Star firefly, 5 points',slow:'Slow time orb'}[type]);
+  var f={el:el,type:type,x:Math.random()*w,y:h*(.45+Math.random()*.5),vx:(Math.random()-.5)*60,vy:-(15+Math.random()*35),life:p.life*(type==='bonus'?.7:1)*(.8+Math.random()*.4),t:Math.random()*6};
+  el.addEventListener('pointerdown',function(ev){ev.preventDefault();hit(f)});
+  field.appendChild(el);flies.push(f);place(f);
+}
+function place(f){f.el.style.left=f.x+'px';f.el.style.top=f.y+'px'}
+function pop(f,txt){
+  var p=document.createElement('div');p.className='pop';p.textContent=txt;
+  p.style.left=f.x+'px';p.style.top=f.y+'px';field.appendChild(p);
+  requestAnimationFrame(function(){p.style.transform='translateY(-40px)';p.style.opacity='0'});
+  setTimeout(function(){p.remove()},650);
+}
+function say(t){banner.textContent=t;banner.classList.add('show');clearTimeout(bt);bt=setTimeout(function(){banner.classList.remove('show')},1100)}
+function hit(f){
+  if(!running)return;
+  var d=1,txt='+1';
+  if(f.type==='moth'){d=-2;txt='−2';sfx.moth()}
+  else if(f.type==='bonus'){d=5;txt='+5';sfx.bonus()}
+  else if(f.type==='slow'){d=0;txt='Slow!';slowLeft=4;app.classList.add('slowed');sfx.slow()}
+  else sfx.catch();
+  if(f.type!=='moth'&&f.type!=='slow'){
+    caught+=f.type==='bonus'?2:1;
+    var nl=1+Math.floor(caught/8);
+    if(nl>level){level=nl;lvlEl.textContent=level;say('Level '+level);sfx.level()}
+  }
+  score=Math.max(0,score+d);scoreEl.textContent=score;
+  pop(f,txt);remove(f);
+}
+function remove(f){f.el.remove();flies=flies.filter(function(x){return x!==f})}
+function frame(ts){
+  if(!running)return;
+  var real=Math.min((ts-last)/1000,.05);last=ts;
+  var dt=real;
+  if(slowLeft>0){dt=real*.4;slowLeft-=real;if(slowLeft<=0)app.classList.remove('slowed')}
+  spawnT-=real;if(spawnT<=0){spawn();spawnT=params().gap*(.8+Math.random()*.5)}
+  clock+=real;
+  var rem=Math.max(0,Math.ceil(DUR-clock));
+  if(String(rem)!==timeEl.textContent)timeEl.textContent=rem;
+  flies.slice().forEach(function(f){
+    f.t+=dt;f.life-=dt;
+    f.x+=(f.vx+Math.sin(f.t*2)*30)*dt;f.y+=f.vy*dt;
+    place(f);if(f.life<=0)remove(f);
+  });
+  if(clock>=DUR)return end();
+  requestAnimationFrame(frame);
+}
+function start(){
+  if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}
+  if(ac&&ac.state==='suspended')ac.resume();
+  flies.forEach(function(f){f.el.remove()});flies=[];
+  score=0;caught=0;level=1;clock=0;spawnT=0;slowLeft=0;app.classList.remove('slowed');
+  scoreEl.textContent=0;lvlEl.textContent=1;timeEl.textContent=DUR;
+  panel.classList.add('hidden');running=true;last=performance.now();requestAnimationFrame(frame);
+}
+function end(){
+  running=false;sfx.end();
+  var isBest=score>best;
+  if(isBest){best=score;try{localStorage.setItem('firefly-best',String(best))}catch(e){}}
+  $('title').textContent=score+' in the jar';
+  $('msg').textContent='You reached level '+level+'.'+(isBest&&score>0?' New best!':'');
+  $('bestline').textContent='Best: '+best;
+  $('start').textContent='Catch again';
+  panel.classList.remove('hidden');$('start').focus();
+}
+$('start').addEventListener('click',start);
+})();
+</script>
+</body>
+</html>
